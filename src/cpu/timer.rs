@@ -30,5 +30,7 @@ pub fn ticks() -> u64 {
 pub const fn frequency_hz() -> u32 { FREQUENCY_HZ }
 
 unsafe fn outb(port: u16, value: u8) {
-    asm!("out dx, al", in("dx") port, in("al") value, options(nomem, nostack, preserves_flags));
+    unsafe {
+        asm!("out dx, al", in("dx") port, in("al") value, options(nomem, nostack, preserves_flags));
+    }
 }
