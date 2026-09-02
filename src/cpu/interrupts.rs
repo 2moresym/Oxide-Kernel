@@ -4,7 +4,7 @@ use x86_64::{
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
-use super::{gdt, pic, timer};
+use super::{gdt, pic, scheduler, timer};
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
 
@@ -42,14 +42,13 @@ extern "x86-interrupt" fn page_fault_handler(
 ) {
     crate::kprintln!(
         "EXCEPTION: PAGE FAULT at {:?} ({:?})\n{:#?}",
-        Cr2::read(),
-        error_code,
-        stack_frame,
+        Cr2::read(), error_code, stack_frame,
     );
     crate::halt_loop()
 }
 
 extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
     timer::tick();
+    scheduler::tick();
     pic::end_of_interrupt(0);
 }
