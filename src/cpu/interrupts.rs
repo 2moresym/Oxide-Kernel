@@ -1,14 +1,15 @@
-use lazy_static::lazy_static;
+use spin::Once;
 use x86_64::{
-    instructions::segmentation::CS,
     registers::control::Cr2,
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
 use super::gdt;
 
-lazy_static! {
-    static ref IDT: InterruptDescriptorTable = {
+static IDT: Once<InterruptDescriptorTable> = Once::new();
+
+pub fn init() {
+    IDT.call_once(|| {
         let mut idt = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         unsafe {
@@ -18,11 +19,8 @@ lazy_static! {
         }
         idt.page_fault.set_handler_fn(page_fault_handler);
         idt
-    };
-}
-
-pub fn init() {
-    IDT.load();
+    })
+    .load();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
