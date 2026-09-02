@@ -49,6 +49,9 @@ extern "x86-interrupt" fn page_fault_handler(
 
 extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
     timer::tick();
-    scheduler::tick();
+
+    // The legacy PIC must be acknowledged before a preemptive switch. The current
+    // task may not resume this handler for a long time after the switch.
     pic::end_of_interrupt(0);
+    scheduler::tick();
 }
