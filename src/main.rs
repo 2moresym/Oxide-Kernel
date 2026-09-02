@@ -29,16 +29,27 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let level_4_table = unsafe { memory::active_level_4_table(physical_memory_offset) };
     kprintln!("Paging: active level-4 table at {:p}", level_4_table as *mut _);
 
-    let mut frame_allocator = unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
-    if let Some(frame) = frame_allocator.allocate_frame() {
-        kprintln!("Memory: first usable 4 KiB frame: {:?}", frame);
+    // Keep explicit checkpoints here while the memory subsystem is still small. If boot
+    // stops, the last line identifies the exact subsystem that failed.
+    kprintln!("Memory: initializing frame allocator...");
+    let mut frame_allocator = unsafe {
+        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
+    kprintln!("Memory: frame allocator initialized.");
+
+    match frame_allocator.allocate_frame() {
+        Some(frame) => kprintln!("Memory: first usable 4 KiB frame: {:?}", frame),
+        None => kprintln!("Memory: no usable 4 KiB frame was reported."),
     }
+    kprintln!("Memory: frame allocator checkpoint passed.");
 
     // Proves that the breakpoint exception is handled without rebooting QEMU.
+    kprintln!("CPU: testing breakpoint exception...");
     x86_64::instructions::interrupts::int3();
     kprintln!("CPU: breakpoint exception handled.");
 
     // Build the first scheduler tasks before enabling IRQ0.
+    kprintln!("Scheduler: initializing...");
     cpu::scheduler::init();
     kprintln!("Scheduler: ready for preemptive task switching.");
 
