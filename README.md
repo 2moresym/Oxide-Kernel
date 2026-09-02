@@ -20,8 +20,7 @@ involved.
 ```bash
 rustup toolchain install nightly
 rustup component add rust-src --toolchain nightly
-cargo +nightly bootimage
-cargo +nightly bootimage run
+cargo +nightly run
 ```
 
 QEMU should display `Oxide OS` and `x86_64 kernel booted successfully.`
