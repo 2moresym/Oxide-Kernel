@@ -18,7 +18,7 @@ pub fn init() {
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         }
         idt.page_fault.set_handler_fn(page_fault_handler);
-        idt[pic::PIC1_OFFSET as usize].set_handler_fn(timer_handler);
+        idt[pic::PIC1_OFFSET].set_handler_fn(timer_handler);
         idt
     })
     .load();
