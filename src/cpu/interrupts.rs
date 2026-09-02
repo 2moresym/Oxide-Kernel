@@ -8,56 +8,38 @@ use x86_64::{
 use super::{gdt, pic, scheduler, timer};
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
-
-// Breakpoint diagnostic state. The handler deliberately does not touch the console so
-// IDT dispatch and the interrupt-return path can be tested independently.
 static BREAKPOINT_STAGE: AtomicU8 = AtomicU8::new(0);
 
-pub const BREAKPOINT_NOT_RUN: u8 = 0;
 pub const BREAKPOINT_ENTERED: u8 = 1;
 
-pub fn breakpoint_stage() -> u8 {
-    BREAKPOINT_STAGE.load(Ordering::Acquire)
-}
+#[inline]
+pub fn breakpoint_stage() -> u8 { BREAKPOINT_STAGE.load(Ordering::Acquire) }
 
 pub fn init() {
     IDT.call_once(|| {
         let mut idt = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         unsafe {
-            idt.double_fault
-                .set_handler_fn(double_fault_handler)
+            idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         }
         idt.page_fault.set_handler_fn(page_fault_handler);
         idt[pic::PIC1_OFFSET].set_handler_fn(timer_handler);
         idt
-    })
-    .load();
+    }).load();
 }
 
-// Minimal handler: reaching this store proves that the CPU dispatched INT3 through
-// the IDT. Returning then exercises the x86_64 interrupt-return path.
 extern "x86-interrupt" fn breakpoint_handler(_stack_frame: InterruptStackFrame) {
     BREAKPOINT_STAGE.store(BREAKPOINT_ENTERED, Ordering::Release);
 }
 
-extern "x86-interrupt" fn double_fault_handler(
-    _stack_frame: InterruptStackFrame,
-    error_code: u64,
-) -> ! {
+extern "x86-interrupt" fn double_fault_handler(_stack_frame: InterruptStackFrame, error_code: u64) -> ! {
     crate::kprintln!("EXCEPTION: DOUBLE FAULT ({})", error_code);
     crate::halt_loop()
 }
 
-extern "x86-interrupt" fn page_fault_handler(
-    _stack_frame: InterruptStackFrame,
-    error_code: PageFaultErrorCode,
-) {
-    crate::kprintln!(
-        "EXCEPTION: PAGE FAULT at {:?} ({:?})",
-        Cr2::read(), error_code,
-    );
+extern "x86-interrupt" fn page_fault_handler(_stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
+    crate::kprintln!("EXCEPTION: PAGE FAULT at {:?} ({:?})", Cr2::read(), error_code);
     crate::halt_loop()
 }
 
