@@ -25,14 +25,14 @@ pub fn init() {
     let tss = TSS.call_once(|| {
         let mut tss = TaskStateSegment::new();
         let stack_start = VirtAddr::from_ptr(&raw const DOUBLE_FAULT_STACK);
-        let stack_end = stack_start + DOUBLE_FAULT_STACK_SIZE;
+        let stack_end = stack_start + DOUBLE_FAULT_STACK_SIZE as u64;
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = stack_end;
         tss
     });
 
     let (gdt, selectors) = GDT.call_once(|| {
         let mut gdt = GlobalDescriptorTable::new();
-        let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
+        let code_selector = gdt.append(Descriptor::kernel_code_segment());
         let tss_selector = gdt.add_entry(Descriptor::tss_segment(tss));
         (gdt, Selectors { code_selector, tss_selector })
     });
