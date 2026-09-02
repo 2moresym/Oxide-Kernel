@@ -1,3 +1,4 @@
+use core::sync::atomic::{AtomicU8, Ordering};
 use spin::Once;
 use x86_64::{
     registers::control::Cr2,
@@ -7,6 +8,17 @@ use x86_64::{
 use super::{gdt, pic, scheduler, timer};
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
+
+// Breakpoint diagnostic state. The handler deliberately does not touch the console so
+// IDT dispatch and the interrupt-return path can be tested independently.
+static BREAKPOINT_STAGE: AtomicU8 = AtomicU8::new(0);
+
+pub const BREAKPOINT_NOT_RUN: u8 = 0;
+pub const BREAKPOINT_ENTERED: u8 = 1;
+
+pub fn breakpoint_stage() -> u8 {
+    BREAKPOINT_STAGE.load(Ordering::Acquire)
+}
 
 pub fn init() {
     IDT.call_once(|| {
@@ -24,10 +36,10 @@ pub fn init() {
     .load();
 }
 
-// Keep early exception handlers tiny. Formatting the complete interrupt frame can
-// consume substantial stack space and makes it harder to isolate interrupt-return bugs.
+// Minimal handler: reaching this store proves that the CPU dispatched INT3 through
+// the IDT. Returning then exercises the x86_64 interrupt-return path.
 extern "x86-interrupt" fn breakpoint_handler(_stack_frame: InterruptStackFrame) {
-    crate::kprintln!("EXCEPTION: BREAKPOINT HANDLED");
+    BREAKPOINT_STAGE.store(BREAKPOINT_ENTERED, Ordering::Release);
 }
 
 extern "x86-interrupt" fn double_fault_handler(
