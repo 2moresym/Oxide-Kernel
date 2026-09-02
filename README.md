@@ -2,34 +2,41 @@
 
 Oxide OS is an experimental x86_64 operating system written primarily in Rust.
 
-## Milestone 1: boot and print
+## Current milestone: diagnostics and memory foundations
 
-The kernel uses the Rust `bootloader` crate to enter a freestanding `no_std`
-x86_64 kernel. It writes a success message directly to the VGA text buffer and
-then idles using the CPU `hlt` instruction. No Linux kernel or Linux runtime is
-involved.
+The freestanding `no_std` kernel boots through the Rust `bootloader` crate and:
 
-### Prerequisites
+- mirrors kernel logs to VGA text mode and QEMU's COM1 serial port;
+- loads a GDT plus an exception IDT, including a dedicated double-fault stack;
+- reports breakpoint and page-fault diagnostics;
+- reads the bootloader memory map, exposes the active level-4 page table, and
+  creates a safe-to-use-next `BootInfoFrameAllocator` for usable 4 KiB frames.
 
-- Rust nightly with the `rust-src` component
-- [`bootimage`](https://github.com/rust-osdev/bootimage): `cargo install bootimage`
-- QEMU (`qemu-system-x86_64`)
+Hardware interrupts deliberately remain disabled until the PIC/APIC driver is
+introduced. No Linux kernel or Linux runtime is involved.
 
-### Run
+## Build and run
 
 ```bash
-rustup toolchain install nightly
-rustup component add rust-src --toolchain nightly
+rustup toolchain install nightly --profile minimal
+rustup component add rust-src llvm-tools-preview --toolchain nightly
+cargo install bootimage
 cargo +nightly run
 ```
 
-QEMU should display `Oxide OS` and `x86_64 kernel booted successfully.`
+The QEMU window shows VGA output. To also show serial logs in the launching
+terminal, use:
+
+```bash
+cargo +nightly run -- -serial stdio
+```
 
 ## Layout
 
-- `src/main.rs`: early kernel entry point and CPU idle loop
-- `src/vga.rs`: isolated early-console driver
-- `x86_64-oxide.json`: freestanding target definition
+- `src/console.rs`: unified kernel logging API
+- `src/serial.rs`: COM1 serial driver for QEMU diagnostics
+- `src/cpu/`: GDT and exception-IDT initialization
+- `src/memory.rs`: memory-map inspection, page-table access, frame allocation
+- `src/vga.rs`: VGA text-mode driver
 
-Future hardware services will be added as separate modules so kernel entry
-logic stays small.
+The next milestone is physical-frame allocation ownership and safe page mapping.
