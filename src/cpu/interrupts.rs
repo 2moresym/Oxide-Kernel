@@ -24,14 +24,16 @@ pub fn init() {
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
-    crate::kprintln!("EXCEPTION: BREAKPOINT\n{stack_frame:#?}");
+    crate::kprintln!("EXCEPTION: BREAKPOINT
+{:#?}", stack_frame);
 }
 
 extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: u64,
 ) -> ! {
-    crate::kprintln!("EXCEPTION: DOUBLE FAULT ({error_code})\n{stack_frame:#?}");
+    crate::kprintln!("EXCEPTION: DOUBLE FAULT ({})
+{:#?}", error_code, stack_frame);
     crate::halt_loop()
 }
 
@@ -40,8 +42,11 @@ extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     crate::kprintln!(
-        "EXCEPTION: PAGE FAULT at {:?} ({error_code:?})\n{stack_frame:#?}",
+        "EXCEPTION: PAGE FAULT at {:?} ({:?})
+{:#?}",
         Cr2::read(),
+        error_code,
+        stack_frame,
     );
     crate::halt_loop()
 }
