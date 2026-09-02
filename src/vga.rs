@@ -10,8 +10,6 @@ const VGA_BUFFER: *mut ScreenChar = 0xb8000 as *mut ScreenChar;
 #[derive(Clone, Copy)]
 pub enum Color {
     LightGray = 7,
-    LightGreen = 10,
-    LightRed = 12,
 }
 
 #[repr(C)]
@@ -69,8 +67,15 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for column in 0..BUFFER_WIDTH {
-                    let character = unsafe { core::ptr::read_volatile(VGA_BUFFER.add(row * BUFFER_WIDTH + column)) };
-                    unsafe { core::ptr::write_volatile(VGA_BUFFER.add((row - 1) * BUFFER_WIDTH + column), character) };
+                    let character = unsafe {
+                        core::ptr::read_volatile(VGA_BUFFER.add(row * BUFFER_WIDTH + column))
+                    };
+                    unsafe {
+                        core::ptr::write_volatile(
+                            VGA_BUFFER.add((row - 1) * BUFFER_WIDTH + column),
+                            character,
+                        )
+                    };
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
