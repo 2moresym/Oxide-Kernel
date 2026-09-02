@@ -10,10 +10,7 @@ mod vga;
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use x86_64::{
-    structures::paging::FrameAllocator,
-    VirtAddr,
-};
+use x86_64::{structures::paging::FrameAllocator, VirtAddr};
 
 entry_point!(kernel_main);
 
@@ -41,9 +38,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     x86_64::instructions::interrupts::int3();
     kprintln!("CPU: breakpoint exception handled.");
 
-    // IRQ0 is now routed to the PIT handler. HLT will wake for each timer tick.
+    // Build the first scheduler tasks before enabling IRQ0.
+    cpu::scheduler::init();
+    kprintln!("Scheduler: ready for preemptive task switching.");
+
+    // IRQ0 now drives both the system tick and scheduler.
     x86_64::instructions::interrupts::enable();
-    kprintln!("CPU: hardware interrupts enabled; kernel timer is running.");
+    kprintln!("CPU: hardware interrupts enabled; multitasking is live.");
 
     halt_loop()
 }
