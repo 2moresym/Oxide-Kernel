@@ -24,34 +24,33 @@ pub fn init() {
     .load();
 }
 
-extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
-    crate::kprintln!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
+// Keep early exception handlers tiny. Formatting the complete interrupt frame can
+// consume substantial stack space and makes it harder to isolate interrupt-return bugs.
+extern "x86-interrupt" fn breakpoint_handler(_stack_frame: InterruptStackFrame) {
+    crate::kprintln!("EXCEPTION: BREAKPOINT HANDLED");
 }
 
 extern "x86-interrupt" fn double_fault_handler(
-    stack_frame: InterruptStackFrame,
+    _stack_frame: InterruptStackFrame,
     error_code: u64,
 ) -> ! {
-    crate::kprintln!("EXCEPTION: DOUBLE FAULT ({})\n{:#?}", error_code, stack_frame);
+    crate::kprintln!("EXCEPTION: DOUBLE FAULT ({})", error_code);
     crate::halt_loop()
 }
 
 extern "x86-interrupt" fn page_fault_handler(
-    stack_frame: InterruptStackFrame,
+    _stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
     crate::kprintln!(
-        "EXCEPTION: PAGE FAULT at {:?} ({:?})\n{:#?}",
-        Cr2::read(), error_code, stack_frame,
+        "EXCEPTION: PAGE FAULT at {:?} ({:?})",
+        Cr2::read(), error_code,
     );
     crate::halt_loop()
 }
 
 extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
     timer::tick();
-
-    // The legacy PIC must be acknowledged before a preemptive switch. The current
-    // task may not resume this handler for a long time after the switch.
     pic::end_of_interrupt(0);
     scheduler::tick();
 }
