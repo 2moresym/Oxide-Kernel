@@ -1,20 +1,43 @@
 //! Kernel output mirrored to the screen and QEMU's COM1 serial device.
 
-use core::fmt;
+use core::{fmt, sync::atomic::{AtomicBool, Ordering}};
 use spin::Mutex;
+use x86_64::instructions::interrupts;
 
 static OUTPUT_LOCK: Mutex<()> = Mutex::new(());
+static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 pub fn init() {
-    let _lock = OUTPUT_LOCK.lock();
-    crate::serial::init();
-    crate::vga::clear();
+    let was_initialized = INITIALIZED.swap(true, Ordering::AcqRel);
+    if was_initialized {
+        return;
+    }
+
+    let interrupts_were_enabled = interrupts::are_enabled();
+    interrupts::disable();
+    {
+        let _lock = OUTPUT_LOCK.lock();
+        crate::serial::init();
+        crate::vga::clear();
+    }
+    if interrupts_were_enabled {
+        interrupts::enable();
+    }
 }
 
+/// Print atomically with respect to timer IRQs. Interrupts are disabled while the
+/// spinlock is held so a preempting IRQ can never deadlock trying to acquire it.
 pub fn _print(args: fmt::Arguments) {
-    let _lock = OUTPUT_LOCK.lock();
-    crate::vga::write_fmt(args);
-    crate::serial::write_fmt(args);
+    let interrupts_were_enabled = interrupts::are_enabled();
+    interrupts::disable();
+    {
+        let _lock = OUTPUT_LOCK.lock();
+        crate::vga::write_fmt(args);
+        crate::serial::write_fmt(args);
+    }
+    if interrupts_were_enabled {
+        interrupts::enable();
+    }
 }
 
 #[macro_export]
