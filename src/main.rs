@@ -14,7 +14,6 @@ use x86_64::{structures::paging::FrameAllocator, VirtAddr};
 
 entry_point!(kernel_main);
 
-/// The first Rust code reached after the bootloader has prepared the machine.
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     console::init();
     kprintln!("Oxide OS");
@@ -29,8 +28,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let level_4_table = unsafe { memory::active_level_4_table(physical_memory_offset) };
     kprintln!("Paging: active level-4 table at {:p}", level_4_table as *mut _);
 
-    // Keep explicit checkpoints here while the memory subsystem is still small. If boot
-    // stops, the last line identifies the exact subsystem that failed.
     kprintln!("Memory: initializing frame allocator...");
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
@@ -41,19 +38,35 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         Some(frame) => kprintln!("Memory: first usable 4 KiB frame: {:?}", frame),
         None => kprintln!("Memory: no usable 4 KiB frame was reported."),
     }
-    kprintln!("Memory: frame allocator checkpoint passed.");
+    kprintln!("Memory: frame allocation checkpoint passed.");
 
-    // Proves that the breakpoint exception is handled without rebooting QEMU.
-    kprintln!("CPU: testing breakpoint exception...");
+    // Breakpoint diagnostic is split into four observable phases:
+    // 1. execution reaches INT3, 2. the IDT dispatches it, 3. the handler returns,
+    // 4. normal execution resumes after INT3. The handler itself performs no I/O.
+    kprintln!("CPU: breakpoint test 1/4 - executing INT3...");
     x86_64::instructions::interrupts::int3();
-    kprintln!("CPU: breakpoint exception handled.");
+
+    kprintln!("CPU: breakpoint test 2/4 - IDT handler returned.");
+    match cpu::interrupts::breakpoint_stage() {
+        cpu::interrupts::BREAKPOINT_ENTERED => {
+            kprintln!("CPU: breakpoint test 3/4 - handler was entered.");
+        }
+        _ => {
+            kprintln!("CPU: breakpoint test 3/4 - ERROR: handler was not entered.");
+            crate::halt_loop();
+        }
+    }
+
+    // Reaching this statement is the strongest proof that INT3 returned to the
+    // instruction stream instead of faulting, looping, or corrupting the stack.
+    kprintln!("CPU: breakpoint test 4/4 - execution resumed after INT3.");
+    kprintln!("CPU: breakpoint exception path passed all 4 checks.");
 
     // Build the first scheduler tasks before enabling IRQ0.
     kprintln!("Scheduler: initializing...");
     cpu::scheduler::init();
     kprintln!("Scheduler: ready for preemptive task switching.");
 
-    // IRQ0 now drives both the system tick and scheduler.
     x86_64::instructions::interrupts::enable();
     kprintln!("CPU: hardware interrupts enabled; multitasking is live.");
 
