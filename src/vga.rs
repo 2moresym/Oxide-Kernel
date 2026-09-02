@@ -1,6 +1,7 @@
 //! VGA text-mode output for early boot diagnostics.
 
 use core::fmt::{self, Write};
+use spin::Mutex;
 
 const BUFFER_WIDTH: usize = 80;
 const BUFFER_HEIGHT: usize = 25;
@@ -19,13 +20,14 @@ struct ScreenChar {
     color: u8,
 }
 
+static WRITER: Mutex<Writer> = Mutex::new(Writer::new(Color::LightGray));
+
 pub fn clear() {
-    let mut writer = Writer::new(Color::LightGray);
-    writer.clear();
+    WRITER.lock().clear();
 }
 
 pub fn write_fmt(args: fmt::Arguments) {
-    Writer::new(Color::LightGray).write_fmt(args).unwrap();
+    WRITER.lock().write_fmt(args).unwrap();
 }
 
 struct Writer {
@@ -74,8 +76,8 @@ impl Writer {
                         core::ptr::write_volatile(
                             VGA_BUFFER.add((row - 1) * BUFFER_WIDTH + column),
                             character,
-                        )
-                    };
+                        );
+                    }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
