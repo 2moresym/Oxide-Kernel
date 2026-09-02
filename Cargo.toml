@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 bootloader = { version = "0.9.29", features = ["map_physical_memory"] }
 spin = "0.9.8"
-x86_64 = "0.14.13"
+x86_64 = "0.15.5"
 
 [[bin]]
 name = "oxide-kernel"
