@@ -45,7 +45,8 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    kprintln!("\nKERNEL PANIC: {info}");
+    kprintln!("
+KERNEL PANIC: {}", info);
     halt_loop()
 }
 
