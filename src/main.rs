@@ -24,7 +24,8 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kprintln!("x86_64 kernel booted successfully.");
 
     cpu::init();
-    kprintln!("CPU: GDT and exception IDT loaded (hardware interrupts remain disabled).");
+    kprintln!("CPU: GDT, exception IDT, PIC, and PIT initialized.");
+    kprintln!("Timer: {} Hz kernel tick source ready.", cpu::timer::frequency_hz());
 
     memory::log_memory_map(&boot_info.memory_map);
     let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
@@ -38,15 +39,18 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     // Proves that the breakpoint exception is handled without rebooting QEMU.
     x86_64::instructions::interrupts::int3();
-    kprintln!("CPU: breakpoint exception handled; Oxide OS is idle.");
+    kprintln!("CPU: breakpoint exception handled.");
+
+    // IRQ0 is now routed to the PIT handler. HLT will wake for each timer tick.
+    x86_64::instructions::interrupts::enable();
+    kprintln!("CPU: hardware interrupts enabled; kernel timer is running.");
 
     halt_loop()
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    kprintln!("
-KERNEL PANIC: {}", info);
+    kprintln!("\nKERNEL PANIC: {}", info);
     halt_loop()
 }
 
